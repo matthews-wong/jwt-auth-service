@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
+
 import jwt
 
 from jwtauth.config import get_settings
+from jwtauth.security import create_access_token
 
 
 def _login(client, creds) -> dict:
@@ -128,6 +131,67 @@ def test_refresh_token_is_not_accepted_as_access_token(client, registered_user):
         "/auth/me",
         headers={"Authorization": f"Bearer {tokens['refresh_token']}"},
     )
+    assert resp.status_code == 401
+
+
+def _claims_for(tokens: dict) -> dict:
+    """Decode a freshly issued access token to recover its real ``sub``."""
+    settings = get_settings()
+    return jwt.decode(
+        tokens["access_token"],
+        settings.jwt_secret,
+        algorithms=[settings.jwt_algorithm],
+        issuer=settings.jwt_issuer,
+    )
+
+
+# --- access-token security: signature, algorithm and expiry enforcement -----
+
+
+def test_expired_access_token_is_rejected(client, registered_user):
+    """A correctly signed token whose ``exp`` has passed must be refused."""
+    tokens = _login(client, registered_user)
+    user_id = _claims_for(tokens)["sub"]
+    # Mint a token that was already expired an hour ago for the *real* user, so
+    # the only possible reason for a 401 is expiry (not an unknown subject).
+    expired = create_access_token(
+        user_id,
+        get_settings(),
+        now=datetime.now(timezone.utc) - timedelta(hours=1),
+    )
+    resp = client.get("/auth/me", headers={"Authorization": f"Bearer {expired}"})
+    assert resp.status_code == 401
+
+
+def test_tampered_access_token_signature_is_rejected(client, registered_user):
+    """Flipping a byte of the signature must invalidate the token."""
+    tokens = _login(client, registered_user)
+    header, payload, sig = tokens["access_token"].split(".")
+    tampered_sig = ("A" if sig[0] != "A" else "B") + sig[1:]
+    tampered = f"{header}.{payload}.{tampered_sig}"
+    resp = client.get("/auth/me", headers={"Authorization": f"Bearer {tampered}"})
+    assert resp.status_code == 401
+
+
+def test_access_token_signed_with_wrong_secret_is_rejected(client, registered_user):
+    """A token forged with an attacker-controlled secret must be refused."""
+    tokens = _login(client, registered_user)
+    settings = get_settings()
+    claims = _claims_for(tokens)
+    forged = jwt.encode(
+        {**claims, "iss": settings.jwt_issuer},
+        "attacker-controlled-secret",
+        algorithm="HS256",
+    )
+    resp = client.get("/auth/me", headers={"Authorization": f"Bearer {forged}"})
+    assert resp.status_code == 401
+
+
+def test_alg_none_access_token_is_rejected(client, registered_user):
+    """An unsigned ``alg=none`` token (algorithm-confusion attack) must fail."""
+    tokens = _login(client, registered_user)
+    forged = jwt.encode(_claims_for(tokens), key="", algorithm="none")
+    resp = client.get("/auth/me", headers={"Authorization": f"Bearer {forged}"})
     assert resp.status_code == 401
 
 

@@ -202,7 +202,9 @@ The suite covers the full lifecycle: register → login → access a protected
 route; refresh rotation issuing a new token; reuse of a rotated token being
 detected and revoking the family; wrong-password and unknown-user rejection;
 logout revocation; and rejection of a refresh token presented as an access
-token.
+token. Access-token verification is exercised directly against common JWT
+attacks: an expired token, a tampered signature, a token signed with the wrong
+secret, and an unsigned `alg=none` token are each rejected.
 
 ## Roadmap
 
