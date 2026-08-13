@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=68", "wheel"]
+requires = ["setuptools>=78.1.1", "wheel"]  # >=78.1.1: CVE-2024-6345 (RCE) & CVE-2025-47273 (path traversal) in package_index
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -30,7 +30,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=8.0,<9.0",
+    "pytest>=9.0.3,<10.0",  # CVE-2025-71176: predictable /tmp/pytest-of-<user> dir, fixed in 9.0.3
     "httpx>=0.27,<1.0",
 ]
 
