@@ -1,0 +1,37 @@
+# Dependabot configuration for automated dependency updates.
+# Docs: https://docs.github.com/code-security/dependabot/dependabot-version-updates
+version: 2
+updates:
+  # Python dependencies (pyproject.toml / requirements.txt).
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Etc/UTC"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+    commit-message:
+      prefix: "deps"
+      prefix-development: "deps-dev"
+    groups:
+      # Batch low-risk patch/minor bumps into a single PR to cut noise.
+      python-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
+
+  # Keep GitHub Actions used by CI up to date.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Etc/UTC"
+    labels:
+      - "dependencies"
+    commit-message:
+      prefix: "ci"
